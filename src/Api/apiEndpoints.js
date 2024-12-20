@@ -1,0 +1,1 @@
+export const PRODUCT_SEARCH="task/products/search";
