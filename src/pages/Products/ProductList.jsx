@@ -1,4 +1,4 @@
-import { Box, Button, Checkbox } from "@mui/material";
+import { Box, Button, Checkbox, CircularProgress } from "@mui/material";
 import OutlinedInput from "@mui/material/OutlinedInput";
 import axios from "axios";
 import { useEffect, useState } from "react";
@@ -7,6 +7,7 @@ import { MdEdit, MdOutlineCancel } from "react-icons/md";
 import { RiDraggable } from "react-icons/ri";
 import { PRODUCT_SEARCH } from "../../Api/apiEndpoints";
 import CustomModal from "../../Components/CustomModal";
+import useDebounce from "../../hooks/useDebounce";
 import ProductDiscount from "./ProductDiscount";
 import ProductVariant from "./ProductVariant";
 import "./style.css";
@@ -20,22 +21,31 @@ const ProductList = () => {
   const [currentSelectedProducts, setCurrentSelectedProducts] = useState({});
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(null);
+  const [search, setSearch] = useState("");
+  const [isProductListLoading, setIsProductListLoading] = useState(false);
 
-  const getProductList = async () => {
+  const debouncedQuery = useDebounce(search, 500);
+
+  useEffect(() => {
+    getProductList(debouncedQuery);
+  }, [debouncedQuery]);
+
+  const getProductList = async (search = "") => {
+    setIsProductListLoading(true);
     const result = await axios.get(`${BASE_URL}/${PRODUCT_SEARCH}`, {
       headers: {
         "x-api-key": API_KEY,
       },
       params: {
-        search: "",
+        search: search,
         page: 1,
         limit: 10,
       },
     });
+    setIsProductListLoading(false);
     if (Array.isArray(result?.data) && result.data.length) {
       setProductList([...result.data]);
     }
-    console.log({ result });
   };
 
   useEffect(() => {
@@ -59,6 +69,7 @@ const ProductList = () => {
       ...Object.values(currentSelectedProducts)
     );
     setCurrentSelectedProducts([]);
+    setSearch("");
     setSelectedProducts([...products]);
     setProductModalOpen(false);
   };
@@ -89,9 +100,6 @@ const ProductList = () => {
     setSelectedProducts([...products]);
   };
 
-  console.log({
-    selectedProducts,
-  });
   return (
     <Box>
       <Box sx={{ display: "flex" }} className="mb-10">
@@ -193,82 +201,101 @@ const ProductList = () => {
         <div style={{ width: "30rem" }}>
           <div>
             <OutlinedInput
+              value={search}
               startAdornment={<CiSearch fontSize={"2rem"} />}
               placeholder="Search Products"
               fullWidth
               size="small"
+              onChange={(e) => {
+                const { value } = e.target;
+                setSearch(value);
+              }}
             />
           </div>
-          <div>
-            {productList.map((product) => (
-              <div key={product?.id}>
-                <div className="product_name">
-                  <Checkbox
-                    color="success"
-                    checked={Object.keys(currentSelectedProducts).includes(
-                      String(product?.id)
-                    )}
-                    onChange={(event) => {
-                      const { checked } = event.target;
-                      handleProductSelected(
-                        product,
-                        checked,
-                        product?.variants
-                      );
-                    }}
-                    indeterminate={
-                      (currentSelectedProducts?.[product?.id]?.variants ?? [])
-                        .length !== 0 &&
-                      (currentSelectedProducts?.[product?.id]?.variants ?? [])
-                        .length < (product?.variants ?? []).length
-                    }
-                  />
-                  <img
-                    src={product?.image?.src}
-                    // alt={`${product?.title}`}
-                    style={{ height: "2rem", width: "2rem" }}
-                  />
-                  <span>{product?.title}</span>
-                </div>
-                {(product?.variants ?? []).map((variant) => (
-                  <div key={variant?.id} className="product_variants_name">
-                    <div className="flex-between-center">
-                      <Checkbox
-                        color="success"
-                        checked={(
-                          currentSelectedProducts?.[product?.id]?.variants ?? []
-                        ).some((el) => el?.id === variant?.id)}
-                        onChange={(event) => {
-                          const { checked } = event.target;
-                          const selectedVariants = [
-                            ...(currentSelectedProducts?.[product?.id]
-                              ?.variants ?? []),
-                          ];
-                          if (checked) {
-                            selectedVariants.push(variant);
-                          } else {
-                            const index = selectedVariants.findIndex(
-                              (el) => el?.id === variant?.id
-                            );
-                            selectedVariants.splice(index, 1);
-                          }
-                          handleProductSelected(
-                            product,
-                            selectedVariants.length,
-                            selectedVariants
-                          );
-                        }}
-                      />
-                      <span>{variant?.title}</span>
-                    </div>
-                    <div className="flex-end-center">
-                      <span>${variant?.price}</span>
-                    </div>
+          {isProductListLoading ? (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: "20px",
+              }}
+            >
+              <CircularProgress size={40} />
+            </Box>
+          ) : (
+            <div>
+              {productList.map((product) => (
+                <div key={product?.id}>
+                  <div className="product_name">
+                    <Checkbox
+                      color="success"
+                      checked={Object.keys(currentSelectedProducts).includes(
+                        String(product?.id)
+                      )}
+                      onChange={(event) => {
+                        const { checked } = event.target;
+                        handleProductSelected(
+                          product,
+                          checked,
+                          product?.variants
+                        );
+                      }}
+                      indeterminate={
+                        (currentSelectedProducts?.[product?.id]?.variants ?? [])
+                          .length !== 0 &&
+                        (currentSelectedProducts?.[product?.id]?.variants ?? [])
+                          .length < (product?.variants ?? []).length
+                      }
+                    />
+                    <img
+                      src={product?.image?.src}
+                      // alt={`${product?.title}`}
+                      style={{ height: "2rem", width: "2rem" }}
+                    />
+                    <span>{product?.title}</span>
                   </div>
-                ))}
-              </div>
-            ))}
-          </div>
+                  {(product?.variants ?? []).map((variant) => (
+                    <div key={variant?.id} className="product_variants_name">
+                      <div className="flex-between-center">
+                        <Checkbox
+                          color="success"
+                          checked={(
+                            currentSelectedProducts?.[product?.id]?.variants ??
+                            []
+                          ).some((el) => el?.id === variant?.id)}
+                          onChange={(event) => {
+                            const { checked } = event.target;
+                            const selectedVariants = [
+                              ...(currentSelectedProducts?.[product?.id]
+                                ?.variants ?? []),
+                            ];
+                            if (checked) {
+                              selectedVariants.push(variant);
+                            } else {
+                              const index = selectedVariants.findIndex(
+                                (el) => el?.id === variant?.id
+                              );
+                              selectedVariants.splice(index, 1);
+                            }
+                            handleProductSelected(
+                              product,
+                              selectedVariants.length,
+                              selectedVariants
+                            );
+                          }}
+                        />
+                        <span>{variant?.title}</span>
+                      </div>
+                      <div className="flex-end-center">
+                        <span>${variant?.price}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </CustomModal>
     </Box>
