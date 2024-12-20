@@ -1,7 +1,7 @@
 import { Box, Button, Checkbox, CircularProgress } from "@mui/material";
 import OutlinedInput from "@mui/material/OutlinedInput";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CiSearch } from "react-icons/ci";
 import { MdEdit, MdOutlineCancel } from "react-icons/md";
 import { RiDraggable } from "react-icons/ri";
@@ -24,12 +24,35 @@ const ProductList = () => {
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [search, setSearch] = useState("");
   const [isProductListLoading, setIsProductListLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const containerRef = useRef(null);
 
   const debouncedQuery = useDebounce(search, 500);
 
+  const handleScroll = () => {
+    if (containerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+      if (
+        scrollTop + clientHeight >= scrollHeight - 10 &&
+        !isProductListLoading
+      ) {
+        // Load more products when near the bottom
+        setPage((prevPage) => prevPage + 1);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener("scroll", handleScroll);
+      return () => container.removeEventListener("scroll", handleScroll);
+    }
+  }, []);
+
   useEffect(() => {
     getProductList(debouncedQuery);
-  }, [debouncedQuery]);
+  }, [debouncedQuery, page]);
 
   const getProductList = async (search = "") => {
     setIsProductListLoading(true);
@@ -40,13 +63,13 @@ const ProductList = () => {
         },
         params: {
           search: search,
-          page: 1,
+          page: page,
           limit: 10,
         },
       });
       setIsProductListLoading(false);
       if (Array.isArray(result?.data) && result.data.length) {
-        setProductList([...result.data]);
+        setProductList((pre) => [...pre, ...result.data]);
       }
     } catch (error) {
       console.log({ error });
@@ -109,7 +132,7 @@ const ProductList = () => {
   const handleDragNDrop = (result) => {
     const { destination, draggableId } = result;
     if (!destination || !draggableId || !destination?.droppableId) return;
-    let products = [...selectedProducts]
+    let products = [...selectedProducts];
     const [reorderedItem] = products.splice(result.source.index, 1);
     products.splice(result.destination.index, 0, reorderedItem);
     setSelectedProducts([...products]);
@@ -247,7 +270,15 @@ const ProductList = () => {
         cancelButton={"Cancel"}
         submitButton={"Submit"}
       >
-        <div style={{ width: "30rem" }}>
+        <div
+          ref={containerRef}
+          style={{
+            width: "30rem",
+            height: "65vh",
+            overflow: "auto",
+            paddingInlineEnd: "0.5rem",
+          }}
+        >
           <div>
             <OutlinedInput
               value={search}
@@ -274,8 +305,8 @@ const ProductList = () => {
             </Box>
           ) : (
             <div>
-              {productList.map((product) => (
-                <div key={product?.id}>
+              {productList.map((product, index) => (
+                <div key={`${product?.id}_${index}`}>
                   <div className="product_name">
                     <Checkbox
                       color="success"
@@ -297,15 +328,18 @@ const ProductList = () => {
                           .length < (product?.variants ?? []).length
                       }
                     />
-                    <img
+                    {/* <img
                       src={product?.image?.src}
                       // alt={`${product?.title}`}
                       style={{ height: "2rem", width: "2rem" }}
-                    />
+                    /> */}
                     <span>{product?.title}</span>
                   </div>
-                  {(product?.variants ?? []).map((variant) => (
-                    <div key={variant?.id} className="product_variants_name">
+                  {(product?.variants ?? []).map((variant, index) => (
+                    <div
+                      key={`${variant?.id}_${index}`}
+                      className="product_variants_name"
+                    >
                       <div className="flex-between-center">
                         <Checkbox
                           color="success"

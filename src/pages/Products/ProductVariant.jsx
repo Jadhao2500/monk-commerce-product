@@ -16,7 +16,10 @@ const ProductVariant = ({ variants = [], removeVariant = () => {} }) => {
   ) : (
     <Box sx={{ marginInlineStart: "3rem" }} className="mb-10">
       {variants.map((variant, index) => (
-        <Box key={variant?.id} className="flex-between-center mb-10">
+        <Box
+          key={`${variant?.id}_${index}`}
+          className="flex-between-center mb-10"
+        >
           <RiDraggable fontSize={"1.5rem"} className="cursor-pointer" />
           <Box className="variant_name">
             <span style={{ color: "#00000080" }}>{variant?.title}</span>
