@@ -11,6 +11,7 @@ import useDebounce from "../../hooks/useDebounce";
 import ProductDiscount from "./ProductDiscount";
 import ProductVariant from "./ProductVariant";
 import "./style.css";
+import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
 
 const BASE_URL = import.meta.env.VITE_APP_BASE_URL;
 const API_KEY = import.meta.env.VITE_APP_HEADER_KEY;
@@ -32,25 +33,30 @@ const ProductList = () => {
 
   const getProductList = async (search = "") => {
     setIsProductListLoading(true);
-    const result = await axios.get(`${BASE_URL}/${PRODUCT_SEARCH}`, {
-      headers: {
-        "x-api-key": API_KEY,
-      },
-      params: {
-        search: search,
-        page: 1,
-        limit: 10,
-      },
-    });
-    setIsProductListLoading(false);
-    if (Array.isArray(result?.data) && result.data.length) {
-      setProductList([...result.data]);
+    try {
+      const result = await axios.get(`${BASE_URL}/${PRODUCT_SEARCH}`, {
+        headers: {
+          "x-api-key": API_KEY,
+        },
+        params: {
+          search: search,
+          page: 1,
+          limit: 10,
+        },
+      });
+      setIsProductListLoading(false);
+      if (Array.isArray(result?.data) && result.data.length) {
+        setProductList([...result.data]);
+      }
+    } catch (error) {
+      console.log({ error });
+      setIsProductListLoading(false);
     }
   };
 
-  useEffect(() => {
-    getProductList();
-  }, []);
+  // useEffect(() => {
+  //   getProductList();
+  // }, []);
 
   const handleModalOpen = (index = 0) => {
     setSelectedIndex(index);
@@ -94,9 +100,19 @@ const ProductList = () => {
 
   const handleRemoveVariant = (productIndex, variantIndex) => {
     const products = [...selectedProducts];
-    const currentVariants = products[productIndex]?.variants ?? [];
+    const currentVariants = [...(products[productIndex]?.variants ?? [])];
     currentVariants.splice(variantIndex, 1);
-    products["variants"] = currentVariants;
+    products[productIndex]["variants"] = currentVariants;
+    setSelectedProducts([...products]);
+  };
+
+  const handleDragNDrop = (result) => {
+    console.log({ result });
+    const { destination, draggableId } = result;
+    if (!destination || !draggableId || !destination?.droppableId) return;
+    let products = [...selectedProducts]
+    const [reorderedItem] = products.splice(result.source.index, 1);
+    products.splice(result.destination.index, 0, reorderedItem);
     setSelectedProducts([...products]);
   };
 
@@ -105,56 +121,90 @@ const ProductList = () => {
       <Box sx={{ display: "flex" }} className="mb-10">
         <span>Selected Products</span>
       </Box>
-      {selectedProducts.map((product, index) => (
-        <Box key={product?.id} className="mb-10" sx={{ width: "60vw" }}>
-          <Box
-            key={product?.id}
-            sx={{
-              display: "flex",
-              gap: "10px",
-              textAlign: "center",
-              alignItems: "center",
-            }}
-            className="mb-10"
-          >
-            <RiDraggable fontSize={"1.5rem"} className="cursor-pointer" />
-            <div className="product_input">
-              <span style={{ color: "#00000080" }}>{product?.title}</span>
-              <span
-                style={{ position: "absolute", right: "20px" }}
-                className="cursor-pointer"
-              >
-                <MdEdit onClick={() => handleModalOpen(index)} />
-              </span>
+      <DragDropContext onDragEnd={handleDragNDrop}>
+        <Droppable droppableId="droppable">
+          {(provided) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              style={{ width: "60vw" }}
+            >
+              {selectedProducts.map((product, index) => (
+                <Draggable
+                  draggableId={String(index)}
+                  key={index}
+                  index={index}
+                  isDragDisabled={selectedProducts.length < 2}
+                >
+                  {(provided) => (
+                    <Box
+                      key={`${product?.id}_${index}`}
+                      className="mb-10"
+                      sx={{ width: "60vw" }}
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      {...provided.dragHandleProps}
+                    >
+                      <Box
+                        key={`${product?.id}_${index}`}
+                        sx={{
+                          display: "flex",
+                          gap: "10px",
+                          textAlign: "center",
+                          alignItems: "center",
+                        }}
+                        className="mb-10"
+                      >
+                        <RiDraggable
+                          fontSize={"1.5rem"}
+                          className="cursor-pointer"
+                        />
+                        <div className="product_input">
+                          <span style={{ color: "#00000080" }}>
+                            {product?.title}
+                          </span>
+                          <span
+                            style={{ position: "absolute", right: "20px" }}
+                            className="cursor-pointer"
+                          >
+                            <MdEdit onClick={() => handleModalOpen(index)} />
+                          </span>
+                        </div>
+                        <ProductDiscount
+                          product={product}
+                          setDiscount={(key, value) => {
+                            const products = [...selectedProducts];
+                            products[index][key] = value;
+                            setSelectedProducts([...products]);
+                          }}
+                        />
+                        <MdOutlineCancel
+                          fontSize={"1.5rem"}
+                          className="cursor-pointer"
+                          onClick={() => {
+                            handleRemoveProduct(index);
+                          }}
+                        />
+                      </Box>
+                      {product?.variants?.length ? (
+                        <ProductVariant
+                          variants={product?.variants}
+                          removeVariant={(variantIndex) => {
+                            handleRemoveVariant(index, variantIndex);
+                          }}
+                        />
+                      ) : (
+                        <></>
+                      )}
+                    </Box>
+                  )}
+                </Draggable>
+              ))}
             </div>
-            <ProductDiscount
-              product={product}
-              setDiscount={(key, value) => {
-                const products = [...selectedProducts];
-                products[index][key] = value;
-                setSelectedProducts([...products]);
-              }}
-            />
-            <MdOutlineCancel
-              fontSize={"1.5rem"}
-              className="cursor-pointer"
-              onClick={() => {
-                handleRemoveProduct(index);
-              }}
-            />
-          </Box>
-          {product?.variants?.length ? (
-            <ProductVariant
-              variants={product?.variants}
-              removeVariant={(variantIndex) => {
-                handleRemoveVariant(index, variantIndex);
-              }}
-            />
-          ) : (
-            <></>
           )}
-        </Box>
-      ))}
+        </Droppable>
+      </DragDropContext>
+
       {selectedProducts.length ? (
         <Box className="flex-end-center w-100" sx={{ width: "60vw" }}>
           <Button
