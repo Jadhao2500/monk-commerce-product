@@ -107,7 +107,6 @@ const ProductList = () => {
   };
 
   const handleDragNDrop = (result) => {
-    console.log({ result });
     const { destination, draggableId } = result;
     if (!destination || !draggableId || !destination?.droppableId) return;
     let products = [...selectedProducts]
