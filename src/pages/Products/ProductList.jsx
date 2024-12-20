@@ -52,8 +52,12 @@ const ProductList = () => {
   };
 
   const handleModalSubmit = () => {
-    const products=[...selectedProducts];
-    products.splice(selectedIndex,1,...Object.values(currentSelectedProducts))
+    const products = [...selectedProducts];
+    products.splice(
+      selectedIndex,
+      1,
+      ...Object.values(currentSelectedProducts)
+    );
     setCurrentSelectedProducts([]);
     setSelectedProducts([...products]);
     setProductModalOpen(false);
@@ -69,6 +73,20 @@ const ProductList = () => {
       delete selectedProducts[product?.id];
     }
     setCurrentSelectedProducts({ ...selectedProducts });
+  };
+
+  const handleRemoveProduct = (index) => {
+    const products = [...selectedProducts];
+    products.splice(index, 1);
+    setSelectedProducts([...products]);
+  };
+
+  const handleRemoveVariant = (productIndex, variantIndex) => {
+    const products = [...selectedProducts];
+    const currentVariants = products[productIndex]?.variants ?? [];
+    currentVariants.splice(variantIndex, 1);
+    products["variants"] = currentVariants;
+    setSelectedProducts([...products]);
   };
 
   console.log({
@@ -109,16 +127,35 @@ const ProductList = () => {
                 setSelectedProducts([...products]);
               }}
             />
-            <MdOutlineCancel fontSize={"1.5rem"} className="cursor-pointer" />
+            <MdOutlineCancel
+              fontSize={"1.5rem"}
+              className="cursor-pointer"
+              onClick={() => {
+                handleRemoveProduct(index);
+              }}
+            />
           </Box>
-          {product?.variants?.length && (
-            <ProductVariant variants={product?.variants} />
+          {product?.variants?.length ? (
+            <ProductVariant
+              variants={product?.variants}
+              removeVariant={(variantIndex) => {
+                handleRemoveVariant(index, variantIndex);
+              }}
+            />
+          ) : (
+            <></>
           )}
         </Box>
       ))}
       {selectedProducts.length ? (
-        <Box className="flex-end-center w-100">
-          <Button variant="outlined" color="success">
+        <Box className="flex-end-center w-100" sx={{ width: "60vw" }}>
+          <Button
+            variant="outlined"
+            color="success"
+            onClick={() => {
+              handleModalOpen(selectedProducts.length);
+            }}
+          >
             Add Products
           </Button>
         </Box>
@@ -129,6 +166,7 @@ const ProductList = () => {
             gap: "10px",
             textAlign: "center",
             alignItems: "center",
+            width: "60vw",
           }}
         >
           <RiDraggable fontSize={"1.5rem"} className="cursor-pointer" />
